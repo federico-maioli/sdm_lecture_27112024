@@ -1,0 +1,367 @@
+---
+title: "Hands-On Species Distribution Modeling in R"
+format: 
+  html: 
+   smooth-scroll: true
+   embed-resources: true
+   code-fold: true
+   code-summary: "Show the code"
+   toc: true
+   toc-location: left
+   toc-expand: 2
+   toc-depth: 3
+   toc-title: Contents
+   number-sections: true
+   number-depth: 3
+   code-block-bg: true
+   code-block-border-left: "#31BAE9"
+author:
+  - Federico Maioli (fedma@aqua.dtu.dk)
+  - Brian MacKenzie (brm@aqua.dtu.dk)
+date: "`r Sys.Date()`"
+theme: cosmo 
+---
+
+Species Distribution Models (SDMs) correlate species presence or abundance with environmental factors to define species niches and predict their distribution. In this hands-on tutorial, you’ll fit your first SDM using a real-world dataset from FISHGLOB—a comprehensive compilation of fishery-independent trawl surveys spanning the continental shelves of Europe and North America.
+
+# Data overview
+
+To fit SDMs you generally need two key ingredients: observational data (which species are found where) and environmental layers.
+
+## Data Sources
+
+**Fish data**
+
+*If you want to know more about the fish data, see the data paper here <https://www.nature.com/articles/s41597-023-02866-w>*
+
+**Environmental layers**
+
+*If you want to know more about the environmental data, see the data layers here <https://bio-oracle.org/downloads-to-email.php>*
+
+## Load and explore the data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE) 
+```
+
+**NOTE:** *Throughout the tutorial the R code is hidden, but if you want to see code, click the "Show the Code" button.*
+
+```{r}
+# load the libraries
+library(tidyverse)
+library(glmmTMB)
+library(rnaturalearth) #install.packages('rnaturalearth')
+library(rnaturalearthdata)
+library(sf)
+library(ggeffects)
+library(equatiomatic)
+library(patchwork)
+
+# load the data
+data = read_csv('../data/model_input/data.csv') 
+
+```
+
+**Data stucture**
+
+```{r}
+str(data)
+```
+
+**What species are present?**
+
+```{r}
+(species = unique(data$species))
+```
+
+Check them out on [Worms](https://www.marinespecies.org/) or [FishBase](https://www.fishbase.se/search.php).
+
+**Calculate their frequency of occurrence (%)**
+
+```{r}
+
+total_hauls <- n_distinct(data$haul_id) # Calculate the total number of hauls
+
+(data %>%
+  filter(present == 1) %>%                # Only include present species
+  count(species) %>%                       # Count occurrences per species
+  mutate(percentage = n / total_hauls * 100) %>%  # Calculate percentage
+  arrange(desc(percentage)))                 # Sort by percentage
+
+```
+
+**Where do we have observations?**
+
+```{r}
+# extract the coastline
+
+map_data <- rnaturalearth::ne_countries(scale = "large",
+                                        returnclass = "sf",
+                                        continent = "europe")
+
+
+north_sea <- suppressWarnings(suppressMessages(st_crop(
+  map_data, c(
+    xmin = -7,
+    ymin = 49,
+    xmax = 13,
+    ymax = 63
+  )
+)))
+
+# plot the data points
+
+ggplot(data = data, aes(longitude, latitude)) + geom_point(color =
+                                                                     'black', alpha = .3) + 
+  geom_sf(data = north_sea, inherit.aes = F) + theme_light() + xlim(-6, 12) + ylim(50, 62) +
+  ylab('Latitude') + xlab('Longitude')
+
+```
+
+**How many observations (trawls) per year?**
+
+```{r}
+data |> distinct(haul_id, year)|>   group_by(year) |> summarise(number_of_trawls=n()) |> ggplot(aes(year,number_of_trawls))+geom_line()+scale_x_continuous(breaks= scales::pretty_breaks())
+```
+
+# Example - modelling Atlantic cod (*Gadus morhua*) distribution
+
+::: callout-warning
+In this exercise, we’re skipping model assumption checks—a bad practice! But with limited time, I’d rather spark your curiosity about these models and focus only on interpretation.
+:::
+
+## Map the raw data
+
+```{r}
+# add log denisty
+
+data$log_density = log(data$kg_km2+1)
+
+ggplot(data = data |> filter(species=='Gadus_morhua'), aes(longitude, latitude, color = as.factor(present))) + 
+  geom_point(size=.5) + 
+  geom_sf(data = north_sea, inherit.aes = FALSE) + 
+  theme_light() + 
+  xlim(-6, 12) + 
+  ylim(50, 62) +
+  ylab('Latitude') + 
+  xlab('Longitude') + 
+  scale_color_manual(
+    name = "Atlantic cod",
+    values = c("0" = "red", "1" = "blue"),
+    labels = c("0" = "Absent", "1" = "Present")
+  )
+
+ggplot(data = data |> filter(species=='Gadus_morhua'), aes(longitude, latitude, color = log_density)) + 
+  geom_point(size=.5) + 
+  geom_sf(data = north_sea, inherit.aes = FALSE) + 
+  theme_light() + 
+  xlim(-6, 12) + 
+  ylim(50, 62) +
+  ylab('Latitude') + 
+  xlab('Longitude') + scale_color_viridis_c('Atlantic cod log(density)')
+```
+
+## Fit a simple linear model with temperature
+
+```{r}
+my_SDM = lm(log_density ~ 1 + bottom_temp,
+                 data = data |> filter(species=='Gadus_morhua'))
+
+extract_eq(my_SDM, intercept = "beta", show_distribution = TRUE) # More mathy
+
+```
+
+```{r}
+summary(my_SDM) # Let's inspect the params estimates
+```
+
+Can you interpret the intercept?
+
+How do we interpret the slope? With a increase of 1 degree, log density increases/decreases by ...
+
+```{r}
+partial_effect = predict_response(my_SDM, terms = "bottom_temp")
+
+plot(partial_effect, ci_style = "dash")
+```
+
+::: {.callout-note icon="false"}
+## Group discussion (10 minutes)
+
+Do you think this approach is reasonable, or are we missing something? Can you think of any alternatives to a linear model for describing a species’ relationship with temperature?
+:::
+
+### Predict, predict, predict!
+
+Load and inspect the prediction grid:
+
+```{r}
+grid = read_csv('../data/model_input/grid.csv') # load the grid
+
+str(grid)
+```
+
+#### Predict the 'now' scenario
+
+```{r}
+grid$log_density = predict(my_SDM, grid |> mutate(bottom_temp = bottom_temp_now))
+
+p1 = ggplot(data = grid, aes(longitude, latitude, fill = log_density)) + geom_raster() +
+  scale_fill_viridis_c("Atlantic cod log(biomass)"
+  ) + geom_sf(data = north_sea, inherit.aes = F) + theme_light() + xlim(-6, 12) +
+  ylim(50, 62)+ggtitle('Now')
+p1
+```
+
+#### Predict the future (2100) scenario SSP5-8.5
+
+```{r}
+grid$log_density = predict(my_SDM, grid |> mutate(bottom_temp = bottom_temp_2100_ssp585))
+
+p2 = ggplot(data = grid, aes(longitude, latitude, fill = log_density)) + geom_raster() +
+  scale_fill_viridis_c("Atlantic cod log(biomass)"
+  ) + geom_sf(data = north_sea, inherit.aes = F) + theme_light() + xlim(-6, 12) +
+  ylim(50, 62)+ggtitle('2100 SSP5-8.5')
+p2
+```
+
+#### Compare them:
+
+```{r}
+p1 + p2 + plot_layout(guides = 'collect') & scale_fill_viridis_c(limits = range(c(grid$log_density)))  & theme(legend.position="bottom", legend.box = "horizontal")
+```
+
+::: {.callout-note icon="false"}
+## Group discussion (30 minutes)
+
+Is this what you expected? 
+
+Just eyeballing it, based on this model, will the (log)density change a lot under the future scenario, or is it comparable?
+
+Can you think of one simple calculation for comparing the current vs future density?
+
+In this example, we only considered bottom temperature as a driver of species distribution. Can you think of a couple more environmental variables that can influence fish densities?
+:::
+
+## A slightly more complex model
+
+What if we want to predict Atlantic cod presence/absence?
+Well, in this case we need to leave the comfort of linear models and embrace Generalized Linear Models (GLMs).
+
+### Link functions
+
+A GLM has two key parts: 
+
+- the link function, which determines how the mean of the data relates to the predictors
+- the error distribution, which describes the variability around the mean
+
+The link function is a **transformation** that makes the (mean of the) response data linear in relation to the predictors.
+Meanwhile, the error distribution captures how the data spread around this untransformed mean.
+Here we will focus on the **logit link** and the **Bernoulli distribution** as our response data are 0s and 1s. This is commonly referred to as **logistic regression**.
+
+```{r}
+x<- seq(-10, 10, length.out = 100)
+
+plot(x, plogis(x), type = "l")
+```
+
+
+### In practice
+
+```{r}
+my_lr_SDM <- glm(present ~ 1 + bottom_temp,
+                 data = data |> filter(species=='Gadus_morhua'),family = binomial(link = "logit")
+)
+
+extract_eq(my_lr_SDM, wrap = TRUE,intercept = "beta", show_distribution = TRUE)
+
+partial_effect <- predict_response(my_lr_SDM, terms = "bottom_temp") # this function is smart, it's already on the response scale
+
+plot(partial_effect, ci_style = "dash")+ggtitle('')+ylab('Predicted probability of occurence')
+```
+
+Wait it's not linear? What is the interpretation of the slope then?
+
+```{r}
+summary(my_lr_SDM)
+```
+
+The slope is `r (slope <- round(coef(my_lr_SDM)[[2]], 3))`.
+
+Well, the relationship is not linear on the probability scale (i.e. response). The logit-transformed true probabilities follow the estimated intercept and slope.
+
+A unit increase in `bottom_temp` corresponds to a `r slope` increase in the log odds of a `1` (species present) being observed.
+
+
+::: {.callout-tip collapse=true title="Intuition box"}
+
+I took this from https://github.com/seananderson/glmm-course/blob/master/12-glms.Rmd
+
+```{r}
+#| code-fold: false
+logit <- function(x) qlogis(x)
+inverse_logit <- function(x) plogis(x)
+
+x<- seq(-10, 10, length.out = 100)
+
+plot(x, inverse_logit(x), type = "l")
+
+plot(x, logit(inverse_logit(x)), type = "l")
+
+```
+
+If we exponentiate the slope coefficient we get the expected fold increase (decrease) in the *odds* of observing a `1` (the species being present): `r round(exp(slope),2)` per unit increase in `bottom_temp`.
+
+See also [here](https://www.statisticshowto.com/log-odds/).
+
+A quick trick is to take the slope of the logistic regression and divide it by 4. This will give you approximately the expected change in probability per unit change in the variable at the steepest part of the line: `r round(slope/4,2)`. 
+:::
+
+# Now it's you turn! 
+
+Open the script 02_fit_my_model_template.R under 'exercise' and fit your model(s).
+
+# Suggested lectures
+
+## SDMs (with sdmTMB package)
+
+### Introductory
+
+```{r}
+pacman::p_load("vembedr")
+
+embed_url("https://www.youtube.com/watch?v=DIXa7ngVVL0") %>%
+  use_bs_responsive()
+```
+
+### Advanced topics
+
+```{r}
+embed_url("https://www.youtube.com/watch?v=VxnqgiAAjfk") %>%
+  use_bs_responsive()
+```
+
+## Stats
+
+"Statistical Rethinking" is one of the nicest book out there for stats. Also lectures are available online. It's long (20 lectures 1h 15min each) but absolutely worth every bit of effort.
+
+```{r}
+embed_url("https://www.youtube.com/watch?v=FdnMWdICdRs&list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus&index=1") %>%
+  use_bs_responsive()
+```
+
+# Suggested books
+
+## SDMs
+
+- Ovaskainen O., & Abrego N. (2020). Joint Species Distribution Modelling: With Applications in R. Cambridge: Cambridge University Press.
+
+- Thorson, J., & Kristensen, K. (2024). Spatio-Temporal Models for Ecologists (1st ed.). Chapman and Hall/CRC. https://doi.org/10.1201/9781003410294
+
+## Stats
+
+- Gelman, A., Hill, J., & Vehtari, A. (2020). Regression and Other Stories. Cambridge: Cambridge University Press.
+
+- McElreath, R. (2020). Statistical Rethinking: A Bayesian Course with Examples in R and STAN (2nd ed.). Chapman and Hall/CRC. https://doi.org/10.1201/9780429029608
+
