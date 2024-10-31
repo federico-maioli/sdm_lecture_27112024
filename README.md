@@ -21,10 +21,6 @@ You now have a local copy of the repository on your computer!
 
 ## Install R, RStudio, and Necessary Libraries
 
-**Author**: Federico Maioli
-
----
-
 **Note**: It’s very important that you arrive with all the necessary software and R packages installed. If you encounter issues, contact your colleagues, or if you get stuck, email me at [fedma@aqua.dtu.dk](mailto:fedma@aqua.dtu.dk).
 
 ### If You Don’t Have R and RStudio Installed
@@ -44,3 +40,23 @@ RStudio is a visual interface to R. Download the latest version at [https://www.
      "ggeffects", "terra", "sf"),
      dependencies = TRUE)
 ```
+
+### If You Already Have R (and RStudio) Installed
+
+#### Check Your R Version
+
+Run the following command in RStudio to check your R version:
+
+```r
+sessionInfo()
+```
+You need to have a version of R >= 4.3.3.
+If necessary, get the latest version at <https://cran.r-project.org/>.
+
+#### Check Your RStudio Version
+
+In RStudio, go to:
+Mac: RStudio -> About RStudio
+Windows: Help -> About RStudio
+Ensure you have a version of RStudio >= 2024.04.0+735.
+You can download the latest version at <https://www.rstudio.com/products/rstudio/download/>.
