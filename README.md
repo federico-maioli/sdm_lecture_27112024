@@ -1,7 +1,7 @@
 # sdm_lecture_27112024
-Repo for the species distribution models with R
+Repo for the species distribution models (SDMs) with R
 
-## How to Download this Repository
+# How to Download this Repository
 
 To download this repository to your computer:
 
@@ -16,6 +16,17 @@ To download this repository to your computer:
    - Navigate to the extracted folder to access the files.
 
 You now have a local copy of the repository on your computer!
+
+# What's inside
+`r_vocabulary.html` contains some R vocabulary for data manipulation for those who are not familiar with it.
+
+`data/` conatains all the data for running the analysis.
+
+`exercise/` contains:
+- the R demonstration `01_hands_on_sdm.html` that I will use to introduce students to SDMs
+- the template students will use at the end of the lecture for fitting their own model `02_fit_my_model_template.R`
+
+`data_preparation/` contains the scripts for extracting all the data from the sources and prepare them.
 
 # Installation Instructions
 
