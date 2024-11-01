@@ -48,7 +48,8 @@ RStudio is a visual interface to R. Download the latest version at [https://www.
 1. Open RStudio.
 2. Run the following command to install the necessary packages:
 
-   ```r
+
+```r
    install.packages(c("tidyverse", "glmmTMB", "sdmTMB",
      "ggeffects", "terra", "sf"),
      dependencies = TRUE)
