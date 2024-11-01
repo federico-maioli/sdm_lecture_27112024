@@ -1,6 +1,8 @@
 ---
 title: "R vocabulary"
-format: html
+format: 
+   html:
+    embed-resources: true
 editor: visual
 ---
 
@@ -9,7 +11,7 @@ editor: visual
 ## Reading Data
 
 | Function | Description | Example |
-|----|----|----|
+|-----------------|--------------------------|-----------------------------|
 | `read.csv()` | Reads a CSV file into a data frame | `data <- read.csv("file.csv")` |
 | `read.table()` | Reads a table (general text file) | `data <- read.table("file.txt", header = TRUE)` |
 | `read_excel()` | Reads an Excel file (requires `readxl` pkg) | `data <- read_excel("file.xlsx")` |
@@ -18,7 +20,7 @@ editor: visual
 ## Subsetting Data
 
 | Function/Operator | Description | Example |
-|----|----|----|
+|-----------------|--------------------------|-----------------------------|
 | `$` | Selects a single column in a data frame | `data$column_name` |
 | `[` `]` | General indexing for rows and columns | `data[1, ]` (first row), `data[, 2]` (second col) |
 | `subset()` | Subsets data based on a condition | `subset(data, column_name > 5)` |
@@ -28,7 +30,7 @@ editor: visual
 ## Basic Data Manipulation
 
 | Function | Description | Example |
-|----|----|----|
+|-----------------|--------------------------|-----------------------------|
 | `mutate()` | Creates/modifies columns in a data frame (dplyr) | `mutate(data, new_col = col1 * 2)` |
 | `arrange()` | Sorts data by columns (dplyr) | `arrange(data, col1)` |
 | `rename()` | Renames columns in a data frame (dplyr) | `rename(data, new_name = old_name)` |
@@ -38,7 +40,7 @@ editor: visual
 ## Basic Plotting (Using `ggplot2`)
 
 | Function | Description | Example |
-|----|----|----|
+|-----------------|--------------------------|-----------------------------|
 | `ggplot()` | Initializes a plot | `ggplot(data, aes(x = col1, y = col2))` |
 | `geom_point()` | Adds a scatter plot layer | `+ geom_point()` |
 | `geom_line()` | Adds a line plot layer | `+ geom_line()` |
@@ -48,7 +50,7 @@ editor: visual
 ## Other Useful Functions
 
 | Function | Description | Example |
-|----|----|----|
+|-----------------|--------------------------|-----------------------------|
 | `str()` | Shows the structure of an object | `str(data)` |
 | `summary()` | Provides a summary of a data frame | `summary(data)` |
 | `head()` / `tail()` | Shows the first/last few rows of a data frame | `head(data)` |
