@@ -4,3 +4,4 @@
 .Ruserdata
 r_vocabulary_files/
 .qmd
+.DS_Store
