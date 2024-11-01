@@ -3,7 +3,6 @@ title: "R vocabulary"
 format: 
    html:
     embed-resources: true
-editor: visual
 ---
 
 # Basic R Vocabulary for Data Manipulation
